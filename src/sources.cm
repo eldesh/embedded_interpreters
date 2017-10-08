@@ -2,6 +2,7 @@ group
 is
   $/basis-2004.cm
   $/smlunitlib.cm
+  Either.sml
   Util.sml
   Expr.sml
   DYNAMIC.sig
@@ -14,3 +15,7 @@ is
   Builtins.sml
   EXPR_INTERPRETER.sig
   ExprInterpreter.sml
+  ParserCore.sml
+  Parser.sml
+  ExpLexer.sml
+  ExpParser.sml
