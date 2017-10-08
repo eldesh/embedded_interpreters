@@ -1,13 +1,11 @@
 
 signature EMBED =
 sig
-  eqtype EpTree
   type 'a EP
   datatype U = datatype Univ.U
-  val embed   : 'a EP -> ('a->U)
-  val project : 'a EP -> (U->'a)
-  val eptypeof : 'a EP -> EpTree
-  val EpTreeToString : EpTree -> string
+  val embed   : 'a EP -> 'a -> U
+  val project : 'a EP -> U -> 'a
+  val eptypeof : 'a EP -> EpType.t
 
   val S : ('a -> 'b -> 'c) -> ('a -> 'b) -> 'a -> 'c
   val K : 'a -> 'b -> 'a

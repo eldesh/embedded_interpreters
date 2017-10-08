@@ -1,10 +1,13 @@
 group
 is
   $/basis-2004.cm
+  $/smlunitlib.cm
   Util.sml
   Expr.sml
   DYNAMIC.sig
   Dynamic.sml
   Univ.sml
+  EPTYPE.sig
+  EpType.sml
   EMBED.sig
   Embed.sml

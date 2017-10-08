@@ -1,9 +1,13 @@
 
+(**
+ * Embedded / Projection pairs combinator
+ *)
 structure Embed :> EMBED =
 struct
 local
   (* open OS.Process *)
   structure U = Univ
+  structure EpT = EpType
   open Util
 
   fun println str = print (str ^ "\n")
@@ -14,57 +18,43 @@ local
   val cat = concat
 in
   datatype U = datatype Univ.U
-  datatype EpTree = EpPrim of string
-                  | EpDynamic
-                  | EpTuple of EpTree * EpTree
-                  | EpArrow of EpTree * EpTree
-  withtype 'a EP = ('a->U) * (U->'a) * EpTree
+  type 'a EP = ('a->U) * (U->'a) * EpT.t
+
   fun embed (e,p,_) = e
   fun project (e,p,_) = p
   fun cross (f,g) (x,y) = (f x, g y)
   fun arrow (f,g) h = g o h o f
 
-  fun eptypeof ((_,_,t) : 'a EP) : EpTree = t
-  fun EpTreeToString (x:EpTree) : string =
+  fun eptypeof ((_,_,t) : 'a EP) : EpT.t = t
+
+  fun PF (UF(f)) = f
+  fun PP (UP(p)) = p
+  fun PI (UI(n)) = n
+  fun PS (US(s)) = s
+  fun PB (UB(b)) = b
+  fun PU (UU( )) = ()
+  fun PD (UD(d)) = d
+
+  fun newtype () =
     let
-      fun tree2str (EpPrim s) = s
-        | tree2str EpDynamic  = "<Dynamic>"
-        | tree2str (EpTuple (x,y)) = String.concat ["(",tree2str x,"," ,tree2str y,")"]
-        | tree2str (EpArrow (x,y)) = String.concat ["(",tree2str x,"->",tree2str y,")"]
-    in tree2str x
+      val (tod, fromd) = Dynamic.newdyn ()
+    in
+      (UD o tod, fromd o PD, EpT.Dynamic)
     end
-
-  fun PF (UF(f)) = f before println "PF(f)"
-    | PF _       = (print "PF(?)\n"; raise Match)
-  fun PP (UP(p)) = p before println $ cat ["PP(", U.toString (UP p), ")"]
-    | PP _       = (print "PP(?)\n"; raise Match)
-  fun PI (UI(n)) = n before println $ cat ["PI(", Int.toString n, ")"]
-    | PI _       = (print "PI(?)\n"; raise Match)
-  fun PS (US(s)) = s before println $ cat ["PS(", s, ")"]
-    | PS _       = (print "PS(?)\n"; raise Match)
-  fun PB (UB(b)) = b before println $ cat ["PB(", Bool.toString b, ")"]
-    | PB _       = (print "PB(?)\n"; raise Match)
-  fun PU (UU( )) = () before println $ "PU( )"
-    | PU _       = (print "PU(?)\n"; raise Match)
-  fun PD (UD(d)) = d before print "PD(?)"
-
-  (* dynamic type declaration *)
-  fun newtype () = let val (tod,fromd) = Dynamic.newdyn () 
-                   in (UD o tod, fromd o PD, EpDynamic)
-                   end
 
   fun S x y z = x z (y z)
   fun K x y = x
   fun I x = x
 
-  infixr --> infix **
-  val bool   = (UB, PB, EpPrim "bool"  )
-  val unit   = (UU, PU, EpPrim "unit"  )
-  val int    = (UI, PI, EpPrim "int"   )
-  val string = (US, PS, EpPrim "string")
-  val any    = ( I,  I, EpPrim "any"   )
-  fun (e,p,s)** (e',p',s') = (UP o cross (e,e'), cross (p,p') o PP, EpTuple (s,s'))
-  fun (e,p,s)-->(e',p',s') = (UF o arrow (p,e'), arrow (e,p') o PF, EpArrow (s,s'))
+  infixr -->
+  infix **
+  val bool   = (UB, PB, EpT.Prim "bool"  )
+  val unit   = (UU, PU, EpT.Prim "unit"  )
+  val int    = (UI, PI, EpT.Prim "int"   )
+  val string = (US, PS, EpT.Prim "string")
+  val any    = ( I,  I, EpT.Prim "any"   )
+  fun (e,p,s)** (e',p',s') = (UP o cross (e,e'), cross (p,p') o PP, EpT.Tuple (s,s'))
+  fun (e,p,s)-->(e',p',s') = (UF o arrow (p,e'), arrow (e,p') o PF, EpT.Arrow (s,s'))
 
   fun wrap (x:'a->'b, y:'b->'a) (ep:'b EP) : 'a EP =
     ((embed ep) o x, y o (project ep), eptypeof ep)
@@ -78,12 +68,13 @@ in
     end
 
   fun thd (_,_,x) = x
-  fun mu f = (fn x => embed (f (mu f)) x, fn u => project (f (mu f)) u, EpPrim "mu")
+  fun mu f = (fn x => embed (f (mu f)) x, fn u => project (f (mu f)) u, EpT.Prim "mu")
 
   fun list elem = mu (fn l =>
     sum [ wrap (fn []=>(), fn()=>[]) unit
         , wrap (fn (x::xs)=>(x,xs), op::) (elem ** l)
         ])
+
 end (* local *)
 end
 
