@@ -8,12 +8,6 @@ local
   open Univ
   open Expr
   open Embed
-
-  (* --> workaround for sml/nj *)
-  infixr 1 $
-  infixr 5 -->
-  infix  6 **
-  (* <-- workaround for sml/nj *)
 in
   type Exp = Expr.Exp
   type U = Univ.U
@@ -60,8 +54,6 @@ in
                                                  UB b => interpret ((if b then t else f), static) dyn
                                                | _    => (IO.print "failure :(";OS.Process.exit OS.Process.failure)
                            end
-        (* (EApp(EApp(ELam("x",ELam("y",EApp(EId "*",EP(EId "x",EId "y"))))
-        *   , EI 5), EI 8), []) => 40 *)
        | ELam (f, e) => let val s = interpret (e, f::static)
                         in fn dyn => let fun g v = s (v::dyn)
                                          in UF g end
@@ -75,11 +67,19 @@ in
                                            end
                           end
 
+  (* evaluate expression on empty environment *)
   fun interpretclosed e = interpret (e, []) []
 
   local
     open SMLUnit
+    open Assert
     structure U = Univ
+
+    val ($,%,&,?) = let open Test in (TestLabel, TestCase, TestList, assert) end
+
+    val eval = interpret
+    val eval' = interpretclosed
+
     fun partialEqU (u1, u2) =
       case (u1, u2)
         of (UU (), UU ()) => () = ()
@@ -89,37 +89,77 @@ in
          | (UP(v11,v12), UP(v21,v22)) => partialEqU (v11,v21) andalso
                                          partialEqU (v12,v22)
          | (UT(t1,u1), UT(t2,u2)) => t1=t2 andalso partialEqU (u1, u2)
-         | _ => Assert.failByNotEqual (U.toString u1, U.toString u2)
+         | _ => failByNotEqual (U.toString u1, U.toString u2)
 
     fun assertU exp act =
-      Assert.assertEqual partialEqU U.toString exp act
+      assertEqual partialEqU U.toString exp act
   in
     fun testNegate () =
       let
-        val exp = UB false
-        val act = interpretclosed (
-          ELetfun ("negate", "cond",
-                   Eif (EId "cond", EB false, EB true),
-                   EApp (EId "negate", EB true)))
+        val negate_true = ELetfun
+                          ("negate",
+                           "cond",
+                           Eif (EId "cond", EB false, EB true),
+                           EApp (EId "negate", EB true))
+        val negate_false = ELetfun
+                          ("negate",
+                           "cond",
+                           Eif (EId "cond", EB false, EB true),
+                           EApp (EId "negate", EB false))
+        val negate       = ELetfun ("negate", "cond",
+                           Eif (EId "cond", EB false, EB true),
+                           EApp (EId "negate", EId "x"))
       in
-        assertU exp act
+        $("negate",
+          &[ %(fn()=> assertU (UB false) (eval' negate_true )),
+             %(fn()=> assertU (UB  true) (eval' negate_false)),
+             %(fn()=> assertU (UB false) (eval (negate,["x"]) [UB true])),
+             %(fn()=> assertU (UB  true) (eval (negate,["x"]) [UB false]))
+          ])
       end
 
-  fun testSquare () =
-    let 
-      val exp = UI 900
-      val act = interpretclosed
-        (ELetfun ("fun", "arg", EApp (EId "*", EP(EId "arg",EId "arg"))
-                 , EApp (EId "fun", EI 30)))
-    in
-      assertU exp act
-    end
+    fun testSquare () =
+      let
+        (* let fun sq arg = arg * arg *)
+        fun square x = ELetfun
+                       ("sq",
+                        "arg",
+                        EApp
+                          (EId "*",
+                           EP(EId "arg", EId "arg")),
+                        EApp
+                          (EId "sq", EI x))
+      in
+        $("square",
+          &[ %(fn()=> assertU (UI 900) (eval' (square 30))),
+             %(fn()=> assertU (UI   0) (eval' (square  0))),
+             %(fn()=> assertU (UI   1) (eval' (square  1)))
+          ])
+      end
 
-    val test_suite = (fn ()=>
-      Test.labelTests [
-        ("negate", testNegate),
-        ("square", testSquare)
-      ])
+    fun testLambda () =
+      let
+        fun mult x y = EApp
+                        (EApp
+                          (ELam("x",
+                            ELam("y",
+                              EApp(EId "*",
+                                EP(EId "x",EId "y")))),
+                           EI x),
+                         EI y)
+      in
+        $("lambda",
+          &[ %(fn()=> assertU (UI (8*5)) (eval' (mult 8  5))),
+             %(fn()=> assertU (UI (0*42)) (eval' (mult 0 42)))
+          ])
+      end
+
+    fun test_suite () =
+      $("ExprInterpreter",
+        &[ testNegate(),
+           testSquare(),
+           testLambda()
+         ])
 
     val () = SMLUnit.TextUITestRunner.runTest
              {output = TextIO.stdOut}
