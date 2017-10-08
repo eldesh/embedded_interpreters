@@ -50,13 +50,14 @@ in
                                             end
                            end
        | Eif (cond,t,f) => let val s = interpret (cond,static)
-                           in fn dyn => case s dyn of
-                                                 UB b => interpret ((if b then t else f), static) dyn
-                                               | _    => (IO.print "failure :(";OS.Process.exit OS.Process.failure)
+                           in fn dyn =>
+                             case s dyn
+                               of UB b => interpret (if b then t else f, static) dyn
                            end
        | ELam (f, e) => let val s = interpret (e, f::static)
-                        in fn dyn => let fun g v = s (v::dyn)
-                                         in UF g end
+                        in fn dyn =>
+                          let fun g v = s (v::dyn)
+                          in UF g end
                         end
          (* let f x=e1 in e2 *)
        | ELetfun (f,x,e1,e2) =>
