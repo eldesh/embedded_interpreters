@@ -2,9 +2,10 @@
 structure Util =
 struct
   infixr 1 $
-  infixr -->
-  infix **
 
   fun f $ a = f a
+
+  fun fst (f,_) = f
+  fun snd (_,s) = s
 end
 

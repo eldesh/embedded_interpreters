@@ -11,3 +11,6 @@ is
   EpType.sml
   EMBED.sig
   Embed.sml
+  Builtins.sml
+  EXPR_INTERPRETER.sig
+  ExprInterpreter.sml
