@@ -99,14 +99,19 @@ in
   (* let expr *)
   and expr_let ss =
     let
-      val valdef = pack (!TkVal)  ident            (!TkEqual) <&> expr
-      val fundef = pack (!TkFun) (ident <&> ident) (!TkEqual) <&> expr
+      val valdef = pack (!TkVal)  ident                          (!TkEqual) <&> expr
+      val fundef = pack (!TkFun) (ident <&> ident <&> <*> ident) (!TkEqual) <&> expr
       fun letin e = pack (!TkLet) e (!TkIn)
+      (** expand funtion arguments to lambda
+      * because Exp.ELetfun takes just 1 argument.
+      * e.g. {fun f x a0 a1 a2 = body} translated to Letfun(f, x, \a0.\a1.\a2.body)
+      *)
+      fun expand xs body = foldr (fn(EId a,e)=> ELam(a,e)) body xs
     in
           (letin valdef <&> expr
-             <@ (fn( (EId id,         def),body) => ELet(id, def, body)))
+             <@ (fn( (EId id,                 def),body) => ELet(id, def, body)))
       <|> (letin fundef <&> expr
-             <@ (fn(((EId id,EId arg),def),body) => ELetfun(id, arg, def, body)))
+             <@ (fn(((EId id,(EId arg, args)),def),body) => ELetfun(id, arg, expand args def, body)))
       $ ss
     end
 
